@@ -6,6 +6,12 @@ pipeline {
     }
 
     stages {
+        stage("Build") {
+            steps {
+                sh "mvn clean install -DskipTests=true"
+            }
+        }
+        
         stage("Sonar_scan") {
             steps {
                 withSonarQubeEnv('sonar') {
@@ -41,13 +47,6 @@ pipeline {
         stage("trivy scan") {
             steps {
                 sh "trivy fs . > trivyfs.txt"
-            }
-        }
-        
-        stage("Build") {
-            steps {
-                sh "mvn install -DskipTests=true"
-                //sh "mvn clean verify"
             }
         }
         
