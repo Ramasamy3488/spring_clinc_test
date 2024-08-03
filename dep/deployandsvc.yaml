@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: petapp-deployment
+  labels:
+    app: petapp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: petapp
+  template:
+    metadata:
+      labels:
+        app: petapp
+    spec:
+      containers:
+      - name: petapp
+        image: promo286/petapp:6
+        ports:
+        - containerPort: 8080
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: petapp-service
+spec:
+  selector:
+    app: petapp
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  type: LoadBalancer
