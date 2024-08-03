@@ -1,57 +1,73 @@
 pipeline {
     agent any
-    
+
+    environment {
+        SCANNER_HOME=tool 'sonar_scanner'
+    }
+
     stages {
-        stage('Build') {
+        stage("Sonar_scan") {
             steps {
-                script {
-                    sh 'mvn clean deploy -Dmaven.test.skip=true'
+                withSonarQubeEnv('sonar') {
+                    sh ''' $SCANNER_HOME/bin/sonar-scanner \
+                    -Dsonar.projectName=devsecops28_test123 \
+                    -Dsonar.projectKey=devsecops28_test123 \
+                    -Dsonar.organization=devsecops28 \
+                    -Dsonar.java.binaries=target/classes '''
                 }
             }
         }
-
-        stage('Sonar Scanner') {
-            environment {
-                scannerHome = tool 'sonar-tool'
-            }
-            when { expression { params.action == 'Build' } }
+        
+        stage("Quality Gate") {
             steps {
                 script {
-                    withSonarQubeEnv('sonar-server') {
-                        sh """
-                            ${scannerHome}/bin/sonar-scanner \
-                            -Dsonar.projectKey=promoth-28_jenkins-ci \
-                            -Dsonar.organization=promoth-28 \
-                            -Dsonar.projectName=Jenkins-ci \
-                            -Dsonar.language=java \
-                            -Dsonar.sourceEncoding=UTF-8 \
-                            -Dsonar.sources=. \
-                            -Dsonar.java.binaries=target/classes \
-                            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
-                        """
-                    }
+                    waitForQualityGate abortPipeline: false, credentialsId: 'sonar'
                 }
             }
         }
-
-        stage('Quality Gates') {
-            when { expression { params.action == 'Build' } }
+        
+        stage("snyk Scan") {
             steps {
-                script {
-                    timeout(time: 1, unit: 'HOURS') {
-                        def qg = waitForQualityGate()
-                        if (qg.status != 'OK') {
-                            error "Pipeline aborted due to quality gate failure: ${qg.status}"
-                        }
-                    }
-                }
+                snykSecurity(
+                    snykInstallation: 'Snyk_tool',
+                    snykTokenId: 'snyk_api',
+                    failOnError: 'false',
+                    failOnIssues: 'false',
+                    monitorProjectOnBuild: 'true'
+                )
             }
         }
-
-        stage('Docker Build') {
+        
+        stage("trivy scan") {
             steps {
-                script {
-                    app = docker.build(imageName + ":" + version)
+                sh "trivy fs . > trivyfs.txt"
+            }
+        }
+        
+        stage("Build") {
+            steps {
+                sh "mvn install -DskipTests=true"
+                //sh "mvn clean verify"
+            }
+        }
+        
+        stage("Image build") {
+            steps {
+                sh "docker build -t promo286/petapp:${BUILD_NUMBER} ."
+            }
+        }
+        
+        stage("TRIVY") {
+            steps {
+                sh "trivy image promo286/petapp:${BUILD_NUMBER} --scanners vuln > trivyimage.txt"
+            }
+        }
+        
+        stage("Docker Push") {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_PASSWORD')]) {
+                    sh "echo $DOCKERHUB_PASSWORD | docker login -u $DOCKERHUB_USERNAME --password-stdin"
+                    sh "docker push promo286/petapp:${BUILD_NUMBER}"
                 }
             }
         }
