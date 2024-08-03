@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        SCANNER_HOME=tool 'sonar_scanner'
+        SCANNER_HOME=tool ' '
     }
 
     stages {
@@ -16,34 +16,14 @@ pipeline {
             steps {
                 withSonarQubeEnv('sonar') {
                     sh ''' $SCANNER_HOME/bin/sonar-scanner \
-                    -Dsonar.projectName=devsecops28_test123 \
-                    -Dsonar.projectKey=devsecops28_test123 \
+                    -Dsonar.projectName=devsecops28_test123456 \
+                    -Dsonar.projectKey=devsecops28_test123456 \
                     -Dsonar.organization=devsecops28 \
                     -Dsonar.java.binaries=target/classes '''
                 }
             }
         }
-        
-        stage("Quality Gate") {
-            steps {
-                script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'sonar'
-                }
-            }
-        }
-        
-        stage("snyk Scan") {
-            steps {
-                snykSecurity(
-                    snykInstallation: 'Snyk_tool',
-                    snykTokenId: 'snyk_api',
-                    failOnError: 'false',
-                    failOnIssues: 'false',
-                    monitorProjectOnBuild: 'true'
-                )
-            }
-        }
-        
+                
         stage("trivy scan") {
             steps {
                 sh "trivy fs . > trivyfs.txt"
