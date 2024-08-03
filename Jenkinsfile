@@ -16,8 +16,8 @@ pipeline {
             steps {
                 withSonarQubeEnv('sonar') {
                     sh ''' $SCANNER_HOME/bin/sonar-scanner \
-                    -Dsonar.projectName=devsecops28_test123456 \
-                    -Dsonar.projectKey=devsecops28_test123456 \
+                    -Dsonar.projectName=devsecops28_petclinc28 \
+                    -Dsonar.projectKey=devsecops28_petclinc28 \
                     -Dsonar.organization=devsecops28 \
                     -Dsonar.java.binaries=target/classes '''
                 }
