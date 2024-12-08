@@ -7,15 +7,16 @@ pipeline {
     }
 
     stages {
-        stage('RunSCAAnalysisUsingSnyk') {
-            steps {		
+
+        stage('Run SCA Analysis Using Snyk') {
+            steps {
                 echo 'Testing...'
                 sh "chmod +x mvnw"
                 snykSecurity(
                     snykInstallation: 'synktool',
                     snykTokenId: 'snyk-token',
-                    failOnError: 'false',
-                    failOnIssues: 'false'
+                    failOnError: false,
+                    failOnIssues: false
                 )
             }
         }
@@ -25,8 +26,8 @@ pipeline {
                 sh "mvn clean install -DskipTests=true"
             }
         }
-        
-        stage("Sonar_scan") {
+
+        stage("Sonar Scan") {
             steps {
                 withSonarQubeEnv('sonar-server') {
                     sh """
@@ -49,20 +50,22 @@ pipeline {
                 sh "trivy fs . > trivyfs.txt"
             }
         }
-        
+
         stage("Image Build") {
             steps {
                 sh "docker build -t promo286/petapp:${BUILD_NUMBER} ."
             }
         }
-        
+
         stage("Trivy Scan (Docker Image)") {
             steps {
-                sh "trivy image promo286/petapp:${BUILD_NUMBER} --scanners vuln --format table --output trivyimage_table.txt"
-                sh "trivy image promo286/petapp:${BUILD_NUMBER} --scanners vuln --format json --output trivyimage.json"
+                sh """
+                trivy image promo286/petapp:${BUILD_NUMBER} --scanners vuln --format table --output trivyimage_table.txt
+                trivy image promo286/petapp:${BUILD_NUMBER} --scanners vuln --format json --output trivyimage.json
+                """
             }
         }
-        
+
         stage("Docker Push") {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'docker-creds', usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_PASSWORD')]) {
@@ -71,6 +74,12 @@ pipeline {
                     docker push promo286/petapp:${BUILD_NUMBER}
                     """
                 }
+            }
+        }
+
+        stage("Docker Deploy") {
+            steps {
+                sh "docker run -d -it --name demo -p 9000:8000 promo286/petapp:${BUILD_NUMBER}"
             }
         }
     }
