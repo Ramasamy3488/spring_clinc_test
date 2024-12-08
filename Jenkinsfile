@@ -2,41 +2,54 @@ pipeline {
     agent any
 
     environment {
-        SCANNER_HOME=tool 'sonar_scanner'
+        SCANNER_HOME = tool 'sonar-scanner'
+        MAVEN_HOME = tool 'Maven_Home'
     }
 
     stages {
+        stage('RunSCAAnalysisUsingSnyk') {
+            steps {		
+                echo 'Testing...'
+                snykSecurity(
+                    snykInstallation: 'synktool',
+                    snykTokenId: 'snyk-token',
+                    failOnError: 'false',
+                    failOnIssues: 'false'
+                )
+            }
+        }
+
         stage("Build") {
             steps {
-                sh "mvn clean install -DskipTests=true"
+                sh "${MAVEN_HOME}/bin/mvn clean install -DskipTests=true"
             }
         }
         
         stage("Sonar_scan") {
             steps {
-                withSonarQubeEnv('sonar') {
-                    sh ''' $SCANNER_HOME/bin/sonar-scanner \
-                    -Dsonar.projectName=devsecops28_petclinc28 \
-                    -Dsonar.projectKey=devsecops28_petclinc28 \
-                    -Dsonar.organization=devsecops28 \
-                    -Dsonar.java.binaries=target/classes '''
-                }
+                sh """
+                ${MAVEN_HOME}/bin/mvn clean verify sonar:sonar \
+                  -Dsonar.projectKey=petclinc-tes \
+                  -Dsonar.projectName='petclinc-tes' \
+                  -Dsonar.host.url=http://54.242.72.209:9000 \
+                  -Dsonar.token=sqa_f7a08ee0d44d05d578ea7754c2d330841604c4d4
+                """
             }
         }
                 
-        stage("trivy scan") {
+        stage("Trivy Scan (Filesystem)") {
             steps {
                 sh "trivy fs . > trivyfs.txt"
             }
         }
         
-        stage("Image build") {
+        stage("Image Build") {
             steps {
                 sh "docker build -t promo286/petapp:${BUILD_NUMBER} ."
             }
         }
         
-        stage("TRIVY") {
+        stage("Trivy Scan (Docker Image)") {
             steps {
                 sh "trivy image promo286/petapp:${BUILD_NUMBER} --scanners vuln > trivyimage.txt"
             }
@@ -44,9 +57,11 @@ pipeline {
         
         stage("Docker Push") {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_PASSWORD')]) {
-                    sh "echo $DOCKERHUB_PASSWORD | docker login -u $DOCKERHUB_USERNAME --password-stdin"
-                    sh "docker push promo286/petapp:${BUILD_NUMBER}"
+                withCredentials([usernamePassword(credentialsId: 'docker-creds', usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_PASSWORD')]) {
+                    sh """
+                    echo $DOCKERHUB_PASSWORD | docker login -u $DOCKERHUB_USERNAME --password-stdin
+                    docker push promo286/petapp:${BUILD_NUMBER}
+                    """
                 }
             }
         }
