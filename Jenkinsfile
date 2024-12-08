@@ -27,16 +27,22 @@ pipeline {
         
         stage("Sonar_scan") {
             steps {
-                sh """
-                ${MAVEN_HOME}/bin/mvn clean verify sonar:sonar \
-                  -Dsonar.projectKey=petclinc-tes \
-                  -Dsonar.projectName='petclinc-tes' \
-                  -Dsonar.host.url=http://54.242.72.209:9000 \
-                  -Dsonar.token=sqa_f7a08ee0d44d05d578ea7754c2d330841604c4d4
-                """
+                withSonarQubeEnv('sonar-server') {
+                    sh """
+                    ${SCANNER_HOME}/bin/sonar-scanner \
+                        -Dsonar.projectKey=promo286_petclinc \
+                        -Dsonar.organization=promo286 \
+                        -Dsonar.projectName=petclinc \
+                        -Dsonar.language=java \
+                        -Dsonar.sourceEncoding=UTF-8 \
+                        -Dsonar.sources=. \
+                        -Dsonar.java.binaries=target/classes \
+                        -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+                    """
+                }
             }
         }
-                
+
         stage("Trivy Scan (Filesystem)") {
             steps {
                 sh "trivy fs . > trivyfs.txt"
