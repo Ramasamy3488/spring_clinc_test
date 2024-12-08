@@ -10,6 +10,7 @@ pipeline {
         stage('RunSCAAnalysisUsingSnyk') {
             steps {		
                 echo 'Testing...'
+                sh "chmod +x mvnw"
                 snykSecurity(
                     snykInstallation: 'synktool',
                     snykTokenId: 'snyk-token',
@@ -57,7 +58,8 @@ pipeline {
         
         stage("Trivy Scan (Docker Image)") {
             steps {
-                sh "trivy image promo286/petapp:${BUILD_NUMBER} --scanners vuln > trivyimage.txt"
+                sh "trivy image promo286/petapp:${BUILD_NUMBER} --scanners vuln --format table --output trivyimage_table.txt"
+                sh "trivy image promo286/petapp:${BUILD_NUMBER} --scanners vuln --format json --output trivyimage.json"
             }
         }
         
