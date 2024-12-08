@@ -10,7 +10,7 @@ pipeline {
         stage('RunSCAAnalysisUsingSnyk') {
             steps {		
                 echo 'Testing...'
-                sudo chmod +x mvnw
+                chmod +x mvnw
                 snykSecurity(
                     snykInstallation: 'synktool',
                     snykTokenId: 'snyk-token',
