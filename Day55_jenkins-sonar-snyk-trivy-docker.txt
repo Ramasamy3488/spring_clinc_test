@@ -1,0 +1,181 @@
+
+https://github.com/Ramasamy3488/spring_clinc_test.git
+
+
+SONAR:
+
+https://sonarcloud.io/login
+
+---
+myaccount -> security -> name:jenkins-sonar -> generate Token
+
+800067e2a00de69d3b1117bc0a954b452cfa53b0
+
+create credential in Jenkins name: sonar-creds. secret text
+----
+
+
+sonarserver -> my account -> Organization -> manully create -> Create Organization -> name: suryateck-project -> key:suryateck-project -> next ->  free -> create.
+
+
+then -> myproject -> Analyze new project -> create a project manually -> Organization: select -> Display name: Display Name -> next -> Previous version -> create project.
+
+myproject -> expand -> information ->
+
+Project Key
+suryateck-project_petclinic
+
+Organization Key
+suryateck-project
+
+
+Jenkins:
+
+system -> SonarQube servers -> choose, Environment variables -> Add SonarQube -> name: sonar-server -> Server URL: https://sonarcloud.io/ ->
+
+
+sonar installation -> Jenkins -> tools -> SonarQube Scanner installations
+
+
+------------------------------
+
+SNYK:
+
+https://snyk.io/         or   https://app.snyk.io/login
+
+next step -> next step -> Authenticate GitHub.
+---
+kvpramasamy@gmail.com -> account setting -> click to show or revoke and generate.
+
+2331aaaf-5bf5-4132-bbf7-2e9d9c1b132c
+
+create credential -> credential -> Snyk API token -> paste token -> id : snyk-token.
+
+
+Jenkins, -> tools -> Snyk installations -> Add Snyk -> name: snyn-tool -> latest -> apply and save
+
+---------------------------------
+DOCKER HUB:
+
+DockerHub -> account setting -> Personal access tokens -> description:docker-demo -> expiry date: 30 days -> access permission: read&write->generate.
+
+dckr_pat_n9rl5-CafJalTMGhlP-6Qja7SbI
+
+we can use our password or the token.
+
+---------------------------------------------
+
+
+install trivy on ubuntu
+
+sudo dpkg --configure -a
+
+sudo apt-get install wget apt-transport-https gnupg lsb-release
+
+wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+
+echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee -a /etc/apt/sources.list.d/trivy.list
+
+sudo apt-get update
+
+sudo apt-get install trivy
+
+
+---------
+
+in server, 
+
+    apt install maven
+
+
+
+
+---------------------------------------------
+
+
+pipeline {
+    agent any
+
+    environment {
+        SCANNER_HOME = tool 'sonar-scanner'
+        MAVEN_HOME = tool 'Maven_Home'
+    }
+
+    stages {
+
+        stage('Run SCA Analysis Using Snyk') {
+            steps {
+                echo 'Testing...'
+                sh "chmod +x mvnw"
+                snykSecurity(
+                    snykInstallation: 'synktool',
+                    snykTokenId: 'snyk-token',
+                    failOnError: false,
+                    failOnIssues: false
+                )
+            }
+        }
+
+        stage("Build") {
+            steps {
+                sh "mvn clean install -DskipTests=true"
+            }
+        }
+
+        stage("Sonar Scan") {
+            steps {
+                withSonarQubeEnv('sonar-server') {
+                    sh """
+                    ${SCANNER_HOME}/bin/sonar-scanner \
+                        -Dsonar.projectKey=promo286_petclinc \
+                        -Dsonar.organization=promo286 \
+                        -Dsonar.projectName=petclinc \
+                        -Dsonar.language=java \
+                        -Dsonar.sourceEncoding=UTF-8 \
+                        -Dsonar.sources=. \
+                        -Dsonar.java.binaries=target/classes \
+                        -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+                    """
+                }
+            }
+        }
+
+        stage("Trivy Scan (Filesystem)") {
+            steps {
+                sh "trivy fs . > trivyfs.txt"
+            }
+        }
+
+        stage("Image Build") {
+            steps {
+                sh "docker build -t promo286/petapp:${BUILD_NUMBER} ."
+            }
+        }
+
+        stage("Trivy Scan (Docker Image)") {
+            steps {
+                sh """
+                trivy image promo286/petapp:${BUILD_NUMBER} --scanners vuln --format table --output trivyimage_table.txt
+                trivy image promo286/petapp:${BUILD_NUMBER} --scanners vuln --format json --output trivyimage.json
+                """
+            }
+        }
+
+        stage("Docker Push") {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'docker-creds', usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_PASSWORD')]) {
+                    sh """
+                    echo $DOCKERHUB_PASSWORD | docker login -u $DOCKERHUB_USERNAME --password-stdin
+                    docker push promo286/petapp:${BUILD_NUMBER}
+                    """
+                }
+            }
+        }
+
+        stage("Docker Deploy") {
+            steps {
+                sh "docker run -d -it --name demo -p 9000:8000 promo286/petapp:${BUILD_NUMBER}"
+            }
+        }
+    }
+}
