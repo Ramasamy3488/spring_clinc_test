@@ -13,7 +13,7 @@ pipeline {
                 echo 'Testing...'
                 sh "chmod +x mvnw"
                 snykSecurity(
-                    snykInstallation: 'synktool',
+                    snykInstallation: 'snyk-tool',
                     snykTokenId: 'snyk-token',
                     failOnError: false,
                     failOnIssues: false
@@ -32,9 +32,9 @@ pipeline {
                 withSonarQubeEnv('sonar-server') {
                     sh """
                     ${SCANNER_HOME}/bin/sonar-scanner \
-                        -Dsonar.projectKey=promo286_petclinc \
-                        -Dsonar.organization=promo286 \
-                        -Dsonar.projectName=petclinc \
+                        -Dsonar.projectKey=suryateck-project_petclinic \
+                        -Dsonar.organization=suryateck-project \
+                        -Dsonar.projectName=petclinic \
                         -Dsonar.language=java \
                         -Dsonar.sourceEncoding=UTF-8 \
                         -Dsonar.sources=. \
@@ -53,15 +53,15 @@ pipeline {
 
         stage("Image Build") {
             steps {
-                sh "docker build -t promo286/petapp:${BUILD_NUMBER} ."
+                sh "docker build -t ramasamy123/petapp:${BUILD_NUMBER} ."
             }
         }
 
         stage("Trivy Scan (Docker Image)") {
             steps {
                 sh """
-                trivy image promo286/petapp:${BUILD_NUMBER} --scanners vuln --format table --output trivyimage_table.txt
-                trivy image promo286/petapp:${BUILD_NUMBER} --scanners vuln --format json --output trivyimage.json
+                trivy image ramasamy123/petapp:${BUILD_NUMBER} --scanners vuln --format table --output trivyimage_table.txt
+                trivy image ramasamy123/petapp:${BUILD_NUMBER} --scanners vuln --format json --output trivyimage.json
                 """
             }
         }
@@ -71,7 +71,7 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'docker-creds', usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_PASSWORD')]) {
                     sh """
                     echo $DOCKERHUB_PASSWORD | docker login -u $DOCKERHUB_USERNAME --password-stdin
-                    docker push promo286/petapp:${BUILD_NUMBER}
+                    docker push ramasamy123/petapp:${BUILD_NUMBER}
                     """
                 }
             }
@@ -79,7 +79,7 @@ pipeline {
 
         stage("Docker Deploy") {
             steps {
-                sh "docker run -d -it --name demo -p 9000:8000 promo286/petapp:${BUILD_NUMBER}"
+                sh "docker run -d -it --name demo -p 9000:8000 ramasamy123/petapp:${BUILD_NUMBER}"
             }
         }
     }
